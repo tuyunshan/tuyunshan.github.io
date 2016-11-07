@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAMCloud编译部署指南</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="container"><p><div class="toc">
+<ul>
+<li><a href="#ramcloud编译部署指南">RAMCloud编译部署指南</a><ul>
+<li><a href="#1-编译环境要求">编译环境要求</a></li>
+<li><a href="#2-centos下编译环境搭建">CentOS下编译环境搭建</a><ul>
+<li><a href="#21-概述">1 概述</a></li>
+<li><a href="#22-安装gnu-make">2 安装GNU Make</a></li>
+<li><a href="#23-升级gccg">3 升级gccg</a></li>
+<li><a href="#24-安装git">4 安装git</a></li>
+<li><a href="#25-安装perl">5 安装Perl</a></li>
+<li><a href="#26-安装python-26">6 安装Python 26</a></li>
+<li><a href="#27-安装boost">7 安装Boost</a></li>
+<li><a href="#28-安装pcre">8 安装pcre</a></li>
+<li><a href="#29-安装doxygen-172">9 安装Doxygen 172</a></li>
+<li><a href="#210-安装protocol-buffers">10 安装protocol buffers</a></li>
+<li><a href="#211-安装zookeeper">11 安装ZooKeeper</a></li>
+<li><a href="#212-java-and-javac">12 java and javac</a></li>
+</ul>
+</li>
+<li><a href="#3-debian下编译环境搭建">Debian下编译环境搭建</a><ul>
+<li><a href="#31-概述">1 概述</a></li>
+<li><a href="#32-通过aptitude工具安装">2 通过aptitude工具安装</a></li>
+</ul>
+</li>
+<li><a href="#4-编译ramcloud">编译RAMCloud</a><ul>
+<li><a href="#41-pull源码">1 pull源码</a></li>
+<li><a href="#42-编译源码">2 编译源码</a></li>
+</ul>
+</li>
+<li><a href="#5-部署ramcloud">部署RAMCloud</a><ul>
+<li><a href="#51-启动zookeeper">1 启动ZooKeeper</a></li>
+<li><a href="#52-启动coordinate">2 启动Coordinate</a></li>
+<li><a href="#53-启动server">3 启动Server</a></li>
+<li><a href="#54-启动client">4 启动client</a></li>
+<li><a href="#55-运行ramcloud自带的测试程序">5 运行RAMCloud自带的测试程序</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</p>
+
+<p><strong>发布人：tuyunshan</strong> <br>
+<strong>技术交流群：295905581</strong></p>
+
+
+
+<h1 id="ramcloud编译部署指南">RAMCloud编译部署指南</h1>
+
+
+
+<h2 id="1-编译环境要求">1. 编译环境要求</h2>
+
+<ul>
+<li>GNU Make (Anything reasonably recent)</li>
+<li>GNU g++ (4.9.x)</li>
+<li>git (&gt;= 1.6.0)</li>
+<li>Perl (Anything reasonably recent) <br>
+<ul><li>For mergedeps.pl, which automatically inserts included headers in source files into the make dependencies.</li></ul></li>
+<li>Python 2.6, epydoc </li>
+<li>Boost <br>
+<ul><li>If you’re having issues with Boost on Ubuntu, check boost ticket #3844.</li></ul></li>
+<li>pcre</li>
+<li>Doxygen 1.7.2</li>
+<li>protocol buffers</li>
+<li>ZooKeeper</li>
+<li>java and javac (&gt;= 1.7.0_25)</li>
+</ul>
+
+
+
+<h2 id="2-centos下编译环境搭建">2. CentOS下编译环境搭建</h2>
+
+
+
+<h3 id="21-概述">2.1 概述</h3>
+
+<p>本章中所有操作，都是在CentOS 6.5版本上安装部署完成的。不同机器上的配置可能不一样，可以先查看上述编译环境，如果某些编译环境满足要求，下述的相应步骤可以跳过。</p>
+
+<p><strong>注：可以把yum源改换成阿里云源，以下许多就可以通过yum安装了！</strong></p>
+
+
+
+<h3 id="22-安装gnu-make">2.2 安装GNU Make</h3>
+
+<p>使用yum安装</p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum <span class="hljs-attribute">-y</span> make automake</code></pre>
+
+
+
+<h3 id="23-升级gccg">2.3 升级gcc/g++</h3>
+
+<p>因为在RAMCloud源码中采用c++11标准，在编译时候需要加入<code>-std=c++11</code>选项，所以需要升级gcc/g++的版本（本人经验证明4.9.x版本以上都是可以的）。  </p>
+
+<ul>
+<li><p>第一步：下载<a href="ftp://ftp.gnu.org/gnu/gcc/gcc-4.9.2/gcc-4.9.2.tar.gz">gcc</a>安装包（也可手动下载并导入）  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">wget ftp://ftp<span class="hljs-preprocessor">.gnu</span><span class="hljs-preprocessor">.org</span>/gnu/gcc/gcc-<span class="hljs-number">4.9</span><span class="hljs-number">.2</span>/gcc-<span class="hljs-number">4.9</span><span class="hljs-number">.2</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第二步：解压下载文件  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">tar -xzvf gcc-<span class="hljs-number">4.9</span><span class="hljs-number">.2</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第三步：下载gcc依赖文件和库  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> gcc-<span class="hljs-number">4.9</span>.<span class="hljs-number">2</span>  
+./contrib/download_prerequisites</code></pre>
+
+<p>注：如果不能下载gcc依赖文件和库，可以手动下载安装gcc所需的mpfr、gmp和mpc文件（详细安装步骤可以百度）。</p></li>
+<li><p>第四步：配置gcc <br>
+建立一个输出目录，编译时所有生成的中间文件都放到该目录下：  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs perl"><span class="hljs-keyword">mkdir</span> build</code></pre>
+
+<p>工作目录切换至输出目录，并在其中执行配置和安装：  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> build</code></pre>
+
+<p>执行configure配置安装文件,其中<code>--prefix=/usr/local/gcc-4.9.2</code>参数给出了gcc安装目录：  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs brainfuck"><span class="hljs-string">.</span><span class="hljs-string">.</span><span class="hljs-comment">/configure</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">prefix=/usr/local/gcc</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">enable</span><span class="hljs-literal">-</span><span class="hljs-comment">threads=posix</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">disable</span><span class="hljs-literal">-</span><span class="hljs-comment">checking</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">enable</span><span class="hljs-literal">-</span><span class="hljs-comment">languages=c</span><span class="hljs-string">,</span><span class="hljs-comment">c</span><span class="hljs-literal">+</span><span class="hljs-literal">+</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">disable</span><span class="hljs-literal">-</span><span class="hljs-comment">multilib</span></code></pre></li>
+<li><p>第五步：编译gcc（这个过程会很漫长，大约3个小时左右，请耐心等待）  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs go"><span class="hljs-built_in">make</span></code></pre></li>
+<li><p>第六步：安装gcc  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs cmake">make <span class="hljs-keyword">install</span></code></pre></li>
+</ul>
+
+<p>如果已经安装了其他版本的gcc，并且需要备份的，可以采取以下命令：</p>
+
+<ul>
+<li><p>第一步：进入“/usr/bin”目录  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> /usr/bin</code></pre></li>
+<li><p>第二步：依次执行以下命令，重命名原有的gcc链接文件以作为备份  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs brainfuck"><span class="hljs-comment">mv</span> <span class="hljs-comment">gcc</span> <span class="hljs-comment">gcc</span><span class="hljs-string">.</span><span class="hljs-comment">bak</span>  
+<span class="hljs-comment">mv</span> <span class="hljs-comment">g</span><span class="hljs-literal">+</span><span class="hljs-literal">+</span> <span class="hljs-comment">g</span><span class="hljs-literal">+</span><span class="hljs-literal">+</span><span class="hljs-string">.</span><span class="hljs-comment">bak</span></code></pre></li>
+<li><p>第三步：依次执行以下命令，建立gcc 4.9.2的链接  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs livecodeserver"><span class="hljs-built_in">ln</span> -s /usr/<span class="hljs-built_in">local</span>/gcc/bin/gcc /usr/bin/gcc  
+<span class="hljs-built_in">ln</span> -s /usr/<span class="hljs-built_in">local</span>/gcc/bin/g++ /usr/bin/g++</code></pre></li>
+</ul>
+
+<p>最后，可以执行<code>gcc --verion</code>可以查看gcc版本，验证是否安装成功。</p>
+
+
+
+<h3 id="24-安装git">2.4 安装git</h3>
+
+<p>Git是一个开源的分布式版本控制工具。安装git，主要是为了从github上pull源码。</p>
+
+<ul>
+<li><p>通过yum工具安装git（这种方法比较简单）  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs cmake">yum <span class="hljs-keyword">install</span> git</code></pre></li>
+<li><p>源码安装git：先从Git官网下载源码，然后解压，依次输入：<code>./config</code>,<code>make</code>,<code>sudo make install</code>这几个命令安装就好了。  </p></li>
+</ul>
+
+
+
+<h3 id="25-安装perl">2.5 安装Perl</h3>
+
+<ul>
+<li><p>第一步：下载perl源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">wget http://www<span class="hljs-preprocessor">.cpan</span><span class="hljs-preprocessor">.org</span>/src/<span class="hljs-number">5.0</span>/perl-<span class="hljs-number">5.16</span><span class="hljs-number">.1</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第二步：解压源码包   </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">tar -xzvf perl-<span class="hljs-number">5.16</span><span class="hljs-number">.1</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第三步：编译并安装（目录可以自定义）  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">cd perl<span class="hljs-subst">-</span><span class="hljs-number">5.16</span><span class="hljs-number">.1</span>
+<span class="hljs-built_in">.</span>/Configure <span class="hljs-attribute">-des</span> <span class="hljs-attribute">-Dprefix</span><span class="hljs-subst">=</span>/usr/<span class="hljs-built_in">local</span>/perl  
+make  
+make test
+make install</code></pre></li>
+</ul>
+
+<p>如果系统以前已安装了旧版本的perl的话，替换系统原有的版本。  </p>
+
+<ul>
+<li><p>第一步：重命名原有的gcc链接文件以作为备份  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">mv /usr/bin/perl /usr/bin/perl<span class="hljs-preprocessor">.bak</span></code></pre></li>
+<li><p>第二步：建立perl 5.16.1的链接  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs livecodeserver"><span class="hljs-built_in">ln</span> -s /usr/<span class="hljs-built_in">local</span>/perl/bin/perl /usr/bin/perl</code></pre></li>
+</ul>
+
+<p>最后，可以执行<code>perl -v</code>可以查看perl版本，验证是否安装成功。</p>
+
+
+
+<h3 id="26-安装python-26">2.6 安装Python 2.6</h3>
+
+<ul>
+<li><p>第一步：下载Python源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">wget http://www<span class="hljs-preprocessor">.python</span><span class="hljs-preprocessor">.org</span>/ftp/python/<span class="hljs-number">2.6</span><span class="hljs-number">.6</span>/Python-<span class="hljs-number">2.6</span><span class="hljs-number">.6</span><span class="hljs-preprocessor">.tgz</span></code></pre></li>
+<li><p>第二步：解压源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">tar xzf Python-<span class="hljs-number">2.6</span><span class="hljs-number">.6</span><span class="hljs-preprocessor">.tgz</span></code></pre></li>
+<li><p>第三步：编译并安装(目录可以自定义)  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs go">cd Python<span class="hljs-number">-2.6</span><span class="hljs-number">.6</span>  
+./configure --prefix=/usr/local/python2<span class="hljs-number">.6</span>  
+<span class="hljs-built_in">make</span> 
+<span class="hljs-built_in">make</span> install</code></pre></li>
+<li><p>第四步：创建一个python2.6的链接  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs livecodeserver"><span class="hljs-built_in">ln</span> -sf /usr/<span class="hljs-built_in">local</span>/python/bin/python2<span class="hljs-number">.6</span> /usr/bin/python2<span class="hljs-number">.6</span></code></pre></li>
+</ul>
+
+<p>完成后就可以在命令行中输入 python2.6 运行刚刚安装的python2.6.6 版本</p>
+
+
+
+<h3 id="27-安装boost">2.7 安装Boost</h3>
+
+<p>在linux平台下，要编译安装Boost，除gcc和gcc-c++之外，还需要两个开发库：bzip2-devel 和python-devel，因此在安装前应该先保证这两个库已经安装。  </p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum install bzip2 bzip2<span class="hljs-attribute">-devel</span> bzip2<span class="hljs-attribute">-libs</span> python<span class="hljs-attribute">-devel</span> <span class="hljs-attribute">-y</span></code></pre>
+
+<ul>
+<li>第一步：到<a href="www.boost.org">Boost官网</a>下载源码包，本人下载的是boost_1_52_0.tar.bz2。</li>
+<li><p>第二步：解压源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">bzip2 -d boost_1_52_0<span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.bz</span>2  
+tar -xvf  boost_1_52_0<span class="hljs-preprocessor">.tar</span></code></pre></li>
+<li><p>第三步：编译安装，boost源码包中有配置脚本。  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> boost_1_52_0  
+./bootstrap.sh  
+./b2  
+./b2 install --prefix=/usr/local/boost_1_52_0</code></pre></li>
+</ul>
+
+<p>安装完毕后的头文件默认是在/usr/local/boost_1_52_0/include目录下，.a和.so在/usr/local/boost_1_52_0/lib目录下。然后将需要使用的库<code>cp</code>至/usr/lib64 。不然在执行代码时，ldd会提示找不到.so文件。</p>
+
+
+
+<h3 id="28-安装pcre">2.8 安装pcre</h3>
+
+<ul>
+<li><p>第一步：使用<code>rpm</code>命令查看是否安装了pcre软件  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">rpm <span class="hljs-attribute">-qa</span> pcre</code></pre></li>
+<li><p>第二步：编译升级到新版本的pcre。首先把系统里的旧版删除了，然后再进行安装。使用如下命令进行卸载它。  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash">rpm <span class="hljs-operator">-e</span> --nodeps pcre</code></pre></li>
+<li><p>第三步：yum安装pcre    </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum pcre pcre<span class="hljs-attribute">-devel</span></code></pre></li>
+</ul>
+
+
+
+<h3 id="29-安装doxygen-172">2.9 安装Doxygen 1.7.2</h3>
+
+<p>在Doxygen源码安装过程中，需要用到cmake编译器，所以需要安装cmake（如果安装了cmake，此步可跳过）。  </p>
+
+<p>安装cmake </p>
+
+<ul>
+<li><p>第一步：获取cmake源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">wget http://www<span class="hljs-preprocessor">.cmake</span><span class="hljs-preprocessor">.org</span>/files/v2<span class="hljs-number">.8</span>/cmake-<span class="hljs-number">2.8</span><span class="hljs-number">.10</span><span class="hljs-number">.2</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第二步：解压源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">tar -zxvf cmake-<span class="hljs-number">2.8</span><span class="hljs-number">.10</span><span class="hljs-number">.2</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第三步：编译安装cmake  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> cmake-<span class="hljs-number">2.8</span>.<span class="hljs-number">10.2</span>  
+./bootstrap  
+gmake   
+gmake install</code></pre></li>
+</ul>
+
+<p>安装Doxygen</p>
+
+<ul>
+<li><p>第一步：从github仓库拉取源码  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs php">git <span class="hljs-keyword">clone</span> https:<span class="hljs-comment">//github.com/doxygen/doxygen.git</span></code></pre></li>
+<li><p>第二步：编译Doxygen源码  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs bash"><span class="hljs-built_in">cd</span> doxygen  
+mkdir build  
+<span class="hljs-built_in">cd</span> build  
+cmake -G <span class="hljs-string">"Unix Makefiles"</span> ..  
+make</code></pre></li>
+<li><p>第三步：安装Doxygen  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs cmake">make <span class="hljs-keyword">install</span></code></pre></li>
+</ul>
+
+
+
+<h3 id="210-安装protocol-buffers">2.10 安装protocol buffers</h3>
+
+<ul>
+<li><p>第一步：获取源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs ruby">wget <span class="hljs-symbol">https:</span>/<span class="hljs-regexp">/github.com/google</span><span class="hljs-regexp">/protobuf/archive</span><span class="hljs-regexp">/v2.6.1.zip</span></code></pre></li>
+<li><p>第二步：解压源码包</p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">unzip protobuf-<span class="hljs-number">2.6</span><span class="hljs-number">.1</span><span class="hljs-preprocessor">.zip</span></code></pre></li>
+<li><p>第三步：编译安装   </p>
+
+<pre class="prettyprint"><code class="language-shell hljs go">cd protobuf<span class="hljs-number">-2.6</span><span class="hljs-number">.1</span>  
+./configure --prefix=/usr/local/protobuf  
+<span class="hljs-built_in">make</span>  
+<span class="hljs-built_in">make</span> check
+<span class="hljs-built_in">make</span> install</code></pre></li>
+<li><p><strong>第四步：配置环境</strong>  </p>
+
+<p>到此步还没有安装完毕，在/etc/profile或者用户目录~/.bash_profile添加下面内容  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs ruby">    <span class="hljs-comment">####### add protobuf lib path ########  </span>
+    <span class="hljs-comment">#(动态库搜索路径) 程序加载运行期间查找动态链接库时指定除了系统默认路径之外的其他路径  </span>
+    export <span class="hljs-constant">LD_LIBRARY_PATH</span>=<span class="hljs-variable">$LD_LIBRARY_PATH</span><span class="hljs-symbol">:/usr/local/protobuf/lib/</span>
+    <span class="hljs-comment">#(静态库搜索路径) 程序编译期间查找动态链接库时指定查找共享库的路径</span>
+    export <span class="hljs-constant">LIBRARY_PATH</span>=<span class="hljs-variable">$LIBRARY_PATH</span><span class="hljs-symbol">:/usr/local/protobuf/lib/</span>
+    <span class="hljs-comment">#执行程序搜索路径</span>
+    export <span class="hljs-constant">PATH</span>=<span class="hljs-variable">$PATH</span><span class="hljs-symbol">:/usr/local/protobuf/bin/</span>
+    <span class="hljs-comment">#c程序头文件搜索路径</span>
+    export <span class="hljs-constant">C_INCLUDE_PATH</span>=<span class="hljs-variable">$C_INCLUDE_PATH</span><span class="hljs-symbol">:/usr/local/protobuf/include/</span>
+    <span class="hljs-comment">#c++程序头文件搜索路径</span>
+    export <span class="hljs-constant">CPLUS_INCLUDE_PATH</span>=<span class="hljs-variable">$CPLUS_INCLUDE_PATH</span><span class="hljs-symbol">:/usr/local/protobuf/include/</span>
+    <span class="hljs-comment">#pkg-config 路径</span>
+    export <span class="hljs-constant">PKG_CONFIG_PATH</span>=<span class="hljs-regexp">/usr/local</span><span class="hljs-regexp">/protobuf/lib</span><span class="hljs-regexp">/pkgconfig/</span>
+    <span class="hljs-comment">######################################</span></code></pre></li>
+</ul>
+
+
+
+<h3 id="211-安装zookeeper">2.11 安装ZooKeeper</h3>
+
+<p>安装部署ZooKeeper</p>
+
+<ul>
+<li><p>第一步：下载ZooKeeper源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">wget http://www<span class="hljs-preprocessor">.apache</span><span class="hljs-preprocessor">.org</span>/dist//zookeeper/zookeeper-<span class="hljs-number">3.3</span><span class="hljs-number">.6</span>/zookeeper-<span class="hljs-number">3.3</span><span class="hljs-number">.6</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span></code></pre></li>
+<li><p>第二步：解压ZooKeeper源码包  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">tar zxvf zookeeper-<span class="hljs-number">3.3</span><span class="hljs-number">.6</span><span class="hljs-preprocessor">.tar</span><span class="hljs-preprocessor">.gz</span>  
+cd zookeeper-<span class="hljs-number">3.4</span><span class="hljs-number">.6</span></code></pre></li>
+<li><p>第三步：配置ZooKeeper  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm"><span class="hljs-keyword">cp</span> conf/zoo_sample<span class="hljs-preprocessor">.cfg</span> conf/zoo<span class="hljs-preprocessor">.cfg</span>  
+vi conf/zoo<span class="hljs-preprocessor">.cfg</span></code></pre>
+
+<p>配置信息（单机版）如下：  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs ruby">    tickTime=<span class="hljs-number">2000</span>
+    initLimit=<span class="hljs-number">10</span>
+    syncLimit=<span class="hljs-number">5</span>
+    dataDir=<span class="hljs-regexp">/zoo/data</span>
+    dataLogDir=<span class="hljs-regexp">/zoo/logs</span>
+    clientPort=<span class="hljs-number">4180</span>
+    <span class="hljs-comment">#如果报错端口被占用，可以使用下面的参数配置</span>
+    <span class="hljs-comment">#admin.serverPort=12321</span></code></pre>
+
+<p>如果想要配置集群版，可以参照官方或网上ZooKeeper配置教程  </p></li>
+<li><p>第四步：启动ZooKeeper服务器 <br>
+启动ZooKeeper服务  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs sql">./bin/zkServer.sh <span class="hljs-operator"><span class="hljs-keyword">start</span></span></code></pre>
+
+<p>停止ZooKeeper服务  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs vbnet">./bin/zkServer.sh <span class="hljs-keyword">stop</span></code></pre></li>
+</ul>
+
+<p>安装ZooKeeper客户端</p>
+
+<ul>
+<li><p>编译安装  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs go">cd zookeeper<span class="hljs-number">-3.4</span><span class="hljs-number">.5</span>/src/c  
+./configure  
+<span class="hljs-built_in">make</span>   
+<span class="hljs-built_in">make</span> install</code></pre></li>
+<li><p>测试客户端  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs ">./cli_mt localhost:4180</code></pre></li>
+</ul>
+
+
+
+<h3 id="212-java-and-javac">2.12 java and javac</h3>
+
+<p>用yum安装java</p>
+
+<ul>
+<li><p>第一步：查看CentOS自带JDK是否已安装。  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs php">yum <span class="hljs-keyword">list</span> installed |grep java</code></pre></li>
+<li><p>第二步：若有自带安装的JDK且版本不符合要求，卸载CentOS系统自带Java环境。 <br>
+卸载JDK相关文件输入  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum <span class="hljs-attribute">-y</span> remove java<span class="hljs-subst">-</span><span class="hljs-number">1.7</span><span class="hljs-number">.0</span><span class="hljs-attribute">-openjdk</span><span class="hljs-subst">*</span></code></pre>
+
+<p>卸载tzdata-java输入  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum <span class="hljs-attribute">-y</span> remove tzdata<span class="hljs-attribute">-java</span><span class="hljs-built_in">.</span>noarch</code></pre>
+
+<p>当结果显示为Complete！即卸载完毕。  </p></li>
+<li><p>第三步：查看yum库中的Java安装包。  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum <span class="hljs-attribute">-y</span> <span class="hljs-built_in">list</span> java<span class="hljs-subst">*</span></code></pre></li>
+<li><p>第四步：使用yum安装Java环境。  </p>
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">yum <span class="hljs-attribute">-y</span> install java<span class="hljs-subst">-</span><span class="hljs-number">1.7</span><span class="hljs-number">.0</span><span class="hljs-attribute">-openjdk</span><span class="hljs-subst">*</span></code></pre></li>
+</ul>
+
+<p>最后，使用<code>java -version</code>查看java版本。</p>
+
+
+
+<h2 id="3-debian下编译环境搭建">3. Debian下编译环境搭建</h2>
+
+
+
+<h3 id="31-概述">3.1 概述</h3>
+
+<p>本章中所有操作，都是在Debian 8.2版本上安装部署完成的。不同机器上的配置可能不一样，可以先查看上述编译环境，如果某些编译环境满足要求，下述的相应步骤可以跳过。</p>
+
+
+
+<h3 id="32-通过aptitude工具安装">3.2 通过aptitude工具安装</h3>
+
+<p>Debian 8.2默认gcc版本为4.9.2，所以在此不用升级。下面安装上述要求的其它环境。</p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">aptitude install build<span class="hljs-attribute">-essential</span> git<span class="hljs-attribute">-core</span> doxygen libboost1<span class="hljs-number">.42</span><span class="hljs-attribute">-all</span><span class="hljs-attribute">-dev</span> libpcre3<span class="hljs-attribute">-dev</span> protobuf<span class="hljs-attribute">-compiler</span> libprotobuf<span class="hljs-attribute">-dev</span> libcrypto<span class="hljs-subst">++-</span>dev libevent<span class="hljs-attribute">-dev</span> libboost<span class="hljs-attribute">-all</span><span class="hljs-attribute">-dev</span> libgtest<span class="hljs-attribute">-dev</span> openjdk<span class="hljs-subst">-</span><span class="hljs-number">7</span><span class="hljs-attribute">-source</span> libzookeeper<span class="hljs-attribute">-mt</span><span class="hljs-attribute">-dev</span> libssl<span class="hljs-attribute">-dev</span> libcrypto<span class="hljs-subst">++-</span>dev</code></pre>
+
+
+
+<h2 id="4-编译ramcloud">4. 编译RAMCloud</h2>
+
+
+
+<h3 id="41-pull源码">4.1 pull源码</h3>
+
+<p><a href="https://github.com/PlatformLab/RAMCloud">RAMCloud源码</a>放置在github仓库中，可以通过<code>git clone</code>命令拉取源码。  </p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs php">    git <span class="hljs-keyword">clone</span> https:<span class="hljs-comment">//github.com/PlatformLab/RAMCloud.git</span></code></pre>
+
+
+
+<h3 id="42-编译源码">4.2 编译源码</h3>
+
+<p>目标文件和可执行文件将出现在子目录obj.xxx，xxx是你的当前分支（如：master）。</p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs bash">    <span class="hljs-built_in">cd</span> RAMCloud
+    make -j12</code></pre>
+
+<p>默认情况下，以debug模式编译RAMCloud，这个会使系统的速度大大降低。如果你想测试性能，可以不采用debug模式。</p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs go">    <span class="hljs-built_in">make</span> clean
+    <span class="hljs-built_in">make</span> -j12 DEBUG=no</code></pre>
+
+<p>更多编译选项可以参照官网。</p>
+
+
+
+<h2 id="5-部署ramcloud">5. 部署RAMCloud</h2>
+
+<p>集群配置，特定服务器启动，请参照下面的详细叙述。  </p>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs vbscript">    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.208</span>：Zookeeper , Coordinator
+    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.209</span>：<span class="hljs-built_in">Server</span>(master和backup)
+    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.205</span>：<span class="hljs-built_in">Server</span>(master和backup) 
+    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.204</span>：<span class="hljs-built_in">Server</span>(master和backup)
+    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.202</span>：<span class="hljs-built_in">Server</span>(master和backup)
+    <span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.206</span>：Client</code></pre>
+
+
+
+<h3 id="51-启动zookeeper">5.1 启动ZooKeeper</h3>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs bash">    <span class="hljs-built_in">cd</span> zookeeper-<span class="hljs-number">3.4</span>.<span class="hljs-number">5</span>
+    ./bin/zkServer.sh start</code></pre>
+
+
+
+<h3 id="52-启动coordinate">5.2 启动Coordinate</h3>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs nginx">    <span class="hljs-title">cd</span> RAMCloud
+    ./obj.master/coordinator -C tcp:host=<span class="hljs-number">10.11.1.208</span>,port=<span class="hljs-number">11100</span> -x zk:<span class="hljs-number">10.11.1.208:4180</span></code></pre>
+
+<p>具体参数含义，可以参照官网，也可以通过<code>-h</code>或<code>--help</code></p>
+
+
+
+<h3 id="53-启动server">5.3 启动Server</h3>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">    cd RAMCloud
+    sudo <span class="hljs-built_in">.</span>/obj<span class="hljs-built_in">.</span>master/server <span class="hljs-attribute">-L</span> tcp:host<span class="hljs-subst">=</span><span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.205</span>,port<span class="hljs-subst">=</span><span class="hljs-number">1105</span> <span class="hljs-attribute">-x</span> zk:<span class="hljs-number">10.11</span><span class="hljs-number">.1</span><span class="hljs-number">.208</span>:<span class="hljs-number">4180</span> <span class="hljs-subst">--</span>totalMasterMemory <span class="hljs-number">16000</span> <span class="hljs-attribute">-f</span> /dev/sda2  <span class="hljs-subst">--</span>segmentFrames <span class="hljs-number">10000</span> <span class="hljs-attribute">-r</span> <span class="hljs-number">2</span></code></pre>
+
+<p>具体参数含义，可以参照官网，也可以通过<code>-h</code>或<code>--help</code></p>
+
+
+
+<h3 id="54-启动client">5.4 启动client</h3>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs bash">    <span class="hljs-built_in">cd</span> RAMCloud
+    <span class="hljs-built_in">sudo</span> ./obj.master/client -C tcp:host=<span class="hljs-number">10.11</span>.<span class="hljs-number">1.208</span>,port=<span class="hljs-number">11100</span> -L tcp:host=<span class="hljs-number">10.11</span>.<span class="hljs-number">1.205</span>,port=<span class="hljs-number">1105</span></code></pre>
+
+<p>具体参数含义，可以参照官网，也可以通过<code>-h</code>或<code>--help</code></p>
+
+
+
+<h3 id="55-运行ramcloud自带的测试程序">5.5 运行RAMCloud自带的测试程序</h3>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs bash">    <span class="hljs-built_in">cd</span> RAMCloud
+    <span class="hljs-built_in">sudo</span> obj.master/ClusterPerf -C  tcp:host=<span class="hljs-number">10.11</span>.<span class="hljs-number">1.208</span>,port=<span class="hljs-number">11100</span></code></pre>
+
+<p>具体参数含义，可以参照官网，也可以通过<code>-h</code>或<code>--help</code></p></div></body>
+</html>

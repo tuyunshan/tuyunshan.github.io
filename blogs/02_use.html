@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAMCloud使用指南</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="container"><p><div class="toc">
+<ul>
+<li><a href="#ramcloud使用指南">RAMCloud使用指南</a><ul>
+<li><a href="#1-使用c访问ramcloud系统">使用C访问RAMCloud系统</a></li>
+<li><a href="#2-编译链接程序">编译链接程序</a></li>
+<li><a href="#3-运行程序">运行程序</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</p>
+
+<p><strong>发布人：tuyunshan</strong> <br>
+<strong>技术交流群：295905581</strong></p>
+
+
+
+<h1 id="ramcloud使用指南">RAMCloud使用指南</h1>
+
+
+
+<h2 id="1-使用c访问ramcloud系统">1. 使用C++访问RAMCloud系统</h2>
+
+<ul>
+<li>第一步：给出Coordinator服务器地址</li>
+<li>第二步：给出主机名</li>
+<li>第三步：创建表</li>
+<li>第四步：插入数据</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class="language-c++ hljs cpp">    <span class="hljs-preprocessor">#include &lt;string.h&gt;</span>
+    <span class="hljs-preprocessor">#include &lt;iostream&gt;</span>
+
+    <span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> <span class="hljs-built_in">std</span>;
+
+    <span class="hljs-preprocessor">#include "Context.h"</span>
+    <span class="hljs-preprocessor">#include "RamCloud.h"</span>
+
+    <span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> RAMCloud;
+
+    <span class="hljs-keyword">int</span> main(<span class="hljs-keyword">int</span> argc,<span class="hljs-keyword">char</span> *argv[])
+    <span class="hljs-keyword">try</span>{
+           Context context(<span class="hljs-keyword">false</span>);
+           <span class="hljs-built_in">string</span> locate(<span class="hljs-string">"tcp:host=10.11.1.208,port=11100"</span>);
+           <span class="hljs-built_in">string</span> hostname(<span class="hljs-string">"tuyunshan"</span>);
+
+           RamCloud rc(&amp;context,locate.c_str(),hostname.c_str());
+
+           rc.createTable(<span class="hljs-string">"mytable"</span>);
+
+           uint64_t table_Id = rc.getTableId(<span class="hljs-string">"mytable"</span>);
+           <span class="hljs-built_in">cout</span>&lt;&lt;<span class="hljs-string">"table_id = "</span>&lt;&lt;table_Id&lt;&lt;endl;
+
+           rc.write(table_Id,<span class="hljs-string">"myfirst"</span>,<span class="hljs-number">7</span>,<span class="hljs-string">"hello world!"</span>,<span class="hljs-number">13</span>);
+
+           Buffer buffer;
+           rc.read(table_Id,<span class="hljs-string">"myfirst"</span>,<span class="hljs-number">7</span>,&amp;buffer);
+
+           <span class="hljs-built_in">cout</span>&lt;&lt;<span class="hljs-string">"read = "</span>&lt;&lt;<span class="hljs-keyword">static_cast</span>&lt;<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span>*&gt;(buffer.getRange(<span class="hljs-number">0</span>,buffer.size()))&lt;&lt;endl;
+
+           rc.dropTable(<span class="hljs-string">"mytable"</span>);
+
+           <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    }<span class="hljs-keyword">catch</span>(RAMCloud::Exception&amp; e){
+           <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+    }
+</code></pre>
+
+
+
+<h2 id="2-编译链接程序">2. 编译链接程序</h2>
+
+<ul>
+<li>首先把obj.master文件下所有.o文件打包成静态库</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs avrasm">    ar -crv librc<span class="hljs-preprocessor">.a</span> *<span class="hljs-preprocessor">.o</span></code></pre>
+
+<ul>
+<li>然后编译程序</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">    g<span class="hljs-subst">++</span> <span class="hljs-attribute">-I</span>/home/tuyunshan/tt/RAMCloud/src <span class="hljs-attribute">-I</span>/home/tuyunshan/tt/RAMCloud/obj<span class="hljs-built_in">.</span>master <span class="hljs-attribute">-std</span><span class="hljs-subst">=</span>c<span class="hljs-subst">++</span><span class="hljs-number">11</span> <span class="hljs-attribute">-c</span> myrc<span class="hljs-built_in">.</span>cc</code></pre>
+
+<ul>
+<li>最后链接程序</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs lasso">    g<span class="hljs-subst">++</span> <span class="hljs-attribute">-o</span> myrc myrc<span class="hljs-built_in">.</span>o librc<span class="hljs-built_in">.</span>a <span class="hljs-attribute">-lprotobuf</span> <span class="hljs-attribute">-lboost_system</span> <span class="hljs-attribute">-lzookeeper_mt</span> <span class="hljs-attribute">-lpcrecpp</span></code></pre>
+
+
+
+<h2 id="3-运行程序">3. 运行程序</h2>
+
+
+
+<pre class="prettyprint"><code class="language-shell hljs ">    ./myrc</code></pre></div></body>
+</html>
