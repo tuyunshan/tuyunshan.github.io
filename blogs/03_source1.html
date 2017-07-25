@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAMCloud源码分析（一）</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="container"><p><div class="toc">
+<ul>
+<li><a href="#ramcloud源码分析一">RAMCloud源码分析一</a><ul>
+<li><a href="#1-coordinator流程分析">Coordinator流程分析</a></li>
+<li><a href="#2-server流程分析">Server流程分析</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</p>
+
+<p><strong><em>作者：tuyunshan</em></strong> <br>
+<strong><em>RAMCloud技术交流QQ群：295905581</em></strong></p>
+
+<hr>
+
+
+
+<h1 id="ramcloud源码分析一">RAMCloud源码分析（一）</h1>
+
+<hr>
+
+
+
+<h2 id="1-coordinator流程分析">1. Coordinator流程分析</h2>
+
+<p>在RAMCloud集群中，Coordinator是一个重要的服务器，管理集群中所有的server服务器（master+backup）。主要有以下几方面功能：</p>
+
+<ul>
+<li>管理RAMCloud集群中所有活着服务器列表；</li>
+<li>管理所有元数据信息（如，每个server包含哪些tablets）；以至于client可以检索这些信息，管理自己的配置缓存；</li>
+<li>负责判断哪一个server宕机，并初始化server宕机恢复；</li>
+</ul>
+
+<p>Coordinator的主函数，位于/src/CoordinatorMain.cc中。代码执行流程，如图1所示。</p>
+
+<ul>
+<li><strong>第一步：</strong> 设置信号处理函数；</li>
+<li><strong>第二步：</strong> 解析命令行参数；</li>
+<li><strong>第三步：</strong> Pin住所有当前和将来内存中的内存页，以至于OS不把他们交换到磁盘上；</li>
+<li><strong>第四步：</strong> 初始化Transport以及设置PortTimeout和开始portTimer；</li>
+<li><strong>第五步：</strong> 连接外部存储系统，并一直等待，知道成功变为Coordinator in charge；</li>
+<li><strong>第六步：</strong> 创建一个MemoryMonitor对象，定期检查物理内存量（驻留集大小）的使用，发生变化时，打印日志消息；</li>
+<li><strong>第七步：</strong> 创建一个CoordinatorService对象，为coordinator提供RPC服务；</li>
+<li><strong>第八步：</strong> 创建一个PingService对象，仅用于ping请求。将这些请求放置在单独的服务中，允许他们有自己的线程，以至于ping相关的请求不被阻塞，即使在server的其他部分过载;</li>
+<li><strong>第九步：</strong> 轮询是否有需要处理的事件;</li>
+</ul>
+
+<p><img src="http://img.blog.csdn.net/20170725131212316?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTQ1OTEyMA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" alt="这里写图片描述" title=""></p>
+
+
+
+<h2 id="2-server流程分析">2. Server流程分析</h2>
+
+<p>Server是一台实现RAMCloud存储系统的机器。RAMCloud系统拥有许多台Server,他们通常只执行可信RAMCloud代码。Server上执行来自client的RPC请求，以及server之间的相互沟通来管理RAMCloud系统。通常，每个server都作为一个master和一个backup。</p>
+
+<p>在RAMCloud系统中，每个server扮演着两种角色，一个是master（在DRAM中存储object，并处理对这些object的读写请求），另一个是backup（在disk中存储object副本，用于宕机恢复）。master存储介质为DRAM，存储着primary object，所有的读写操作都必须直接访问master获取object。在RAMCloud系统中，每一个server都有一个存储许多不同object的master。master负责把primary object的副本存储到不同backup上，并在宕机恢复中，从disk中检索该信息。</p>
+
+<p>Server的主函数，位于/src/ServerMain.cc中。代码执行流程，如图2所示。</p>
+
+<hr>
+
+<ul>
+<li><strong>第一步：</strong> 设置信号处理函数；</li>
+<li><strong>第二步：</strong> 解析命令行参数；</li>
+<li><strong>第三步：</strong> 判断server类型，设置不同的配置参数；</li>
+<li><strong>第四步：</strong> 初始化Transport；</li>
+<li><strong>第五步：</strong> Transports可能增大local locator，确保server意识到这种改变；</li>
+<li><strong>第六步：</strong> 如果不是backupOnly，设置master.logBytes和master.hashTableBytes；</li>
+<li><strong>第七步：</strong> 设置PortTimeout和开始portTimer；</li>
+<li><strong>第八步：</strong> 创建一个MemoryMonitor对象，定期检查物理内存量（驻留集大小）的使用，发生变化时，打印日志消息；</li>
+<li><strong>第九步：</strong> 创建一个Server对象，并运行server.run()；</li>
+</ul>
+
+<p><img src="http://img.blog.csdn.net/20170725131037238?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTQ1OTEyMA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" alt="这里写图片描述" title=""></p></div></body>
+</html>

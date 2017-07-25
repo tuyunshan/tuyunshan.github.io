@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAMCloud源码分析（二）</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="container"><p><div class="toc">
+<ul>
+<li><a href="#ramcloud源码分析二">RAMCloud源码分析二</a><ul>
+<li><a href="#1-概述">概述</a></li>
+<li><a href="#2-详细分析">详细分析</a><ul>
+<li><a href="#21-serverrun">1 Serverrun</a></li>
+<li><a href="#22-handlefileevent">2 handleFileEvent</a></li>
+<li><a href="#23-workermain">3 workerMain</a></li>
+<li><a href="#24-workermanagerpoll">4 WorkerManagerpoll</a></li>
+</ul>
+</li>
+<li><a href="#3-综述">综述</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</p>
+
+<p><strong><em>作者：tuyunshan</em></strong> <br>
+<strong><em>RAMCloud技术交流QQ群：295905581</em></strong></p>
+
+<hr>
+
+
+
+<h1 id="ramcloud源码分析二">RAMCloud源码分析（二）</h1>
+
+<hr>
+
+
+
+<h2 id="1-概述">1. 概述</h2>
+
+<p>这一部分主要是针对RAMCloud系统中Server进行分析，而本节的侧重点是低延迟，正如论文中所述的，主要从三个方面进行优化。第一个方面，是<strong>绕过内核以及轮询（Kernel Bypass and Polling）</strong>：绕过内核，是上层应用不再需要通过系统内核发送和接收包，而是直接访问控制网卡（NIC）实现收发包；轮询，也叫忙等，是处理一个事件不再通过阻塞与唤醒机制（或是中断的方式），而是一直处于轮询状态，等待并处理事件，这一部分的内容也会在下面的进行详细分析。第二个方面，是<strong>传输协议（Transport）</strong>，主要是采用三种不同类型不同速度的协议，分别是InfrcTransport、FastTransport、TcpTransport，这一部分之前也讨论过，这里就不在赘述。第三个方面，是<strong>线程结构（Thread Structure）</strong>，主要是Dispath与WorkerThreads，这是部分是本节的重点，下面会详细分析。</p>
+
+<p>本节所讨论的内容对应论文p18-26的ACHIEVING LOW LATENCY这一节。</p>
+
+
+
+<h2 id="2-详细分析">2. 详细分析</h2>
+
+
+
+<h3 id="21-serverrun">2.1 Server.run()</h3>
+
+<p>在Server执行流程中分析过server.run()是Server运行的入口。在server.run()中，创建了一个Dispatch对象，并且运行了dispatch.run()开启了一个dispatch线程也就是当前线程，在整个Server运行过程也是唯一，也就是每个Server只能有一个dispatch线程。这个线程是对外的接口，所有的请求都要通过dispatch，然后再分配给相应的WorkerThread处理，当WorkerThread处理完请求后，给dispatch发送响应，再通过dispatch把响应返回给客户端。Dispatch与WorkerThread之间的关系如图1，所示。</p>
+
+<p><img src="http://img.blog.csdn.net/20161122150232695" alt="这里写图片描述" title=""></p>
+
+<p>在dispatch.run()函数中存在一个死循环，不停的执行poll()函数。dispatch的每一次轮询都执行一次poll()函数。当我们进入poll()会发现，poll()函数大致可以分为三个部分。第一，是处理pollers列表中的轮询任务处理pollers列表中的轮询任务（如：WorkerManager.poll()）；第二，是处理File事件，调用file-&gt;handleFileEvent(events)；第三，是处理Timer事件，调用 timer-&gt;handleTimerEvent()。其中File和Timer事件处理，都是通过多态来实现不同类型不同的处理。这些处理的过程都差不多，下面我们仅以TcpTransport::ServerSocketHandler::handleFileEvent()为例，其它的流程类似。上述分析的调用关系如图2，所示。</p>
+
+<p><img src="http://img.blog.csdn.net/20161122150546089" alt="这里写图片描述" title=""></p>
+
+
+
+<h3 id="22-handlefileevent">2.2 handleFileEvent()</h3>
+
+<p>如上文所说，这里仅以TcpTransport::ServerSocketHandler::handleFileEvent()为例，展开分析。如图3，所示。</p>
+
+<p>这个函数位于/src/TcpTransport.cc文件中，主要是处理采用TCP协议的File事件。当一个来自Client端的server连接变成readable或writable时，Dispatch线程调用此函数，在这个函数中把事件分为READABLE，WRITABLE以及二者兼有的三大类。WRITABLE事件处理相对容易理解，不再多说，这里详细分析一下READABLE事件处理。</p>
+
+<p><img src="http://img.blog.csdn.net/20161122150754051" alt="这里写图片描述" title=""></p>
+
+<p>处理READABLE事件主要通过workerManager-&gt;handleRpc(rpc)函数。当我们进入workerManager-&gt;handleRpc(rpc)会发现，这个函数通过从Worker线程中取出一个空闲线程处理该请求的，并且把该线程的状态修改为WORKING。在这里想多说一下，worker线程一共有四种状态，分别为POLLING、WORKING、POSTPROCESSING、SLEEPING（源码中有详细说明其状态转换及各个含义）。此外，每个线程的处理函数都是WorkerManager::workerMain(Worker* worker)，下面将详细叙述workerMain函数。</p>
+
+
+
+<h3 id="23-workermain">2.3 workerMain()</h3>
+
+<p>这个函数是每个worker线程的处理函数，在这函数中最重要的莫过于Service::handleRpc(worker-&gt;context, &amp;rpc);这行代码了，其他部分都比较清楚看一下代码和注释就明白了。在这里用采用多态的方法，不同的service都继承于Service这个基类，然后重载Service的方法，从而实现多态。当进入Service::handleRpc()这个函数后，我们会发现service-&gt;dispatch(opcode, rpc)这行代码，这个就是被重载的函数。</p>
+
+<p><img src="http://img.blog.csdn.net/20161122151145974" alt="这里写图片描述" title=""></p>
+
+<p>如图5，所示，左边的是在Service中实现的一个函数模板，用于针对不同的操作码执行不同的函数。右边是以MasterService（继承于Service）为例，重载了dispatch函数的实现。其中Opcode为操作码，callHandler为回调函数，即左边的函数模板，在图中红色标出的是每个不同事件对应处理函数（如，read、write等等）。当每个处理函数成功完成操作后，会返回一个STATUS_OK。</p>
+
+<p><img src="http://img.blog.csdn.net/20161122151303599" alt="这里写图片描述" title=""></p>
+
+
+
+<h3 id="24-workermanagerpoll">2.4 WorkerManager.poll()</h3>
+
+<p>在这一小节想谈一下WorkerManager.poll()，因为WorkerManager继承于Dispatch::Poller，所以WorkerManager.poll()是Dispatch中的pollers列表中的一个轮询任务，在dispatch.run()函数的第一部分被调度。这个函数主要响应成功完成请求RPC并改变Worker线程所处队列（从忙队列中移动到空闲队列）。这里就不展开了，可以查看/src/WorkerManager.cc查看源码，注释也很详细。</p>
+
+
+
+<h2 id="3-综述">3. 综述</h2>
+
+<p>RAMCloud的Server服务器中，有一个Dispatch线程和一池的Worker线程。Dispatch线程是整个Server对外的接口，并且负责在Worker线程与外部之间转发请求和响应包。Worker线程负责处理来自Dispatch线程的不同请求，完成以后给Dispatch线程发送响应。</p>
+
+<p>通过上面的叙述，相信对Server源码调用关系与执行流程，有了一定了解。因为源码注释很详细，并且命名也易于理解，想深入了解每一行代码，可以深入到源码中。</p></div></body>
+</html>
